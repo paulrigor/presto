@@ -19,8 +19,8 @@ import com.facebook.presto.sql.tree.SymbolReference;
 import org.testng.annotations.Test;
 
 import static com.facebook.presto.sql.ExpressionUtils.rewriteIdentifiersToSymbolReferences;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
-import static org.testng.AssertJUnit.assertFalse;
 
 public class TestExpressionVerifier
 {
@@ -45,7 +45,6 @@ public class TestExpressionVerifier
 
     @Test
     public void testCast()
-            throws Exception
     {
         SymbolAliases aliases = SymbolAliases.builder()
                 .put("X", new SymbolReference("orderkey"))
@@ -55,6 +54,26 @@ public class TestExpressionVerifier
         assertTrue(verifier.process(expression("CAST('2' AS varchar)"), expression("CAST('2' AS varchar)")));
         assertFalse(verifier.process(expression("CAST('2' AS varchar)"), expression("CAST('2' AS bigint)")));
         assertTrue(verifier.process(expression("CAST(orderkey AS varchar)"), expression("CAST(X AS varchar)")));
+    }
+
+    @Test
+    public void testBetween()
+    {
+        SymbolAliases symbolAliases = SymbolAliases.builder()
+                .put("X", new SymbolReference("orderkey"))
+                .put("Y", new SymbolReference("custkey"))
+                .build();
+
+        ExpressionVerifier verifier = new ExpressionVerifier(symbolAliases);
+        // Complete match
+        assertTrue(verifier.process(expression("orderkey BETWEEN 1 AND 2"), expression("X BETWEEN 1 AND 2")));
+        // Different value
+        assertFalse(verifier.process(expression("orderkey BETWEEN 1 AND 2"), expression("Y BETWEEN 1 AND 2")));
+        assertFalse(verifier.process(expression("custkey BETWEEN 1 AND 2"), expression("X BETWEEN 1 AND 2")));
+        // Different min or max
+        assertFalse(verifier.process(expression("orderkey BETWEEN 2 AND 4"), expression("X BETWEEN 1 AND 2")));
+        assertFalse(verifier.process(expression("orderkey BETWEEN 1 AND 2"), expression("X BETWEEN '1' AND '2'")));
+        assertFalse(verifier.process(expression("orderkey BETWEEN 1 AND 2"), expression("X BETWEEN 4 AND 7")));
     }
 
     private Expression expression(String sql)

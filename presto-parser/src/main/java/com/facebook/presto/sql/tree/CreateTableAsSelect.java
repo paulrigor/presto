@@ -14,10 +14,8 @@
 package com.facebook.presto.sql.tree;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -30,27 +28,31 @@ public class CreateTableAsSelect
     private final QualifiedName name;
     private final Query query;
     private final boolean notExists;
-    private final Map<String, Expression> properties;
+    private final List<Property> properties;
     private final boolean withData;
+    private final Optional<List<Identifier>> columnAliases;
+    private final Optional<String> comment;
 
-    public CreateTableAsSelect(QualifiedName name, Query query, boolean notExists, Map<String, Expression> properties, boolean withData)
+    public CreateTableAsSelect(QualifiedName name, Query query, boolean notExists, List<Property> properties, boolean withData, Optional<List<Identifier>> columnAliases, Optional<String> comment)
     {
-        this(Optional.empty(), name, query, notExists, properties, withData);
+        this(Optional.empty(), name, query, notExists, properties, withData, columnAliases, comment);
     }
 
-    public CreateTableAsSelect(NodeLocation location, QualifiedName name, Query query, boolean notExists, Map<String, Expression> properties, boolean withData)
+    public CreateTableAsSelect(NodeLocation location, QualifiedName name, Query query, boolean notExists, List<Property> properties, boolean withData, Optional<List<Identifier>> columnAliases, Optional<String> comment)
     {
-        this(Optional.of(location), name, query, notExists, properties, withData);
+        this(Optional.of(location), name, query, notExists, properties, withData, columnAliases, comment);
     }
 
-    private CreateTableAsSelect(Optional<NodeLocation> location, QualifiedName name, Query query, boolean notExists, Map<String, Expression> properties, boolean withData)
+    private CreateTableAsSelect(Optional<NodeLocation> location, QualifiedName name, Query query, boolean notExists, List<Property> properties, boolean withData, Optional<List<Identifier>> columnAliases, Optional<String> comment)
     {
         super(location);
         this.name = requireNonNull(name, "name is null");
         this.query = requireNonNull(query, "query is null");
         this.notExists = notExists;
-        this.properties = ImmutableMap.copyOf(requireNonNull(properties, "properties is null"));
+        this.properties = ImmutableList.copyOf(requireNonNull(properties, "properties is null"));
         this.withData = withData;
+        this.columnAliases = columnAliases;
+        this.comment = requireNonNull(comment, "comment is null");
     }
 
     public QualifiedName getName()
@@ -68,7 +70,7 @@ public class CreateTableAsSelect
         return notExists;
     }
 
-    public Map<String, Expression> getProperties()
+    public List<Property> getProperties()
     {
         return properties;
     }
@@ -76,6 +78,16 @@ public class CreateTableAsSelect
     public boolean isWithData()
     {
         return withData;
+    }
+
+    public Optional<List<Identifier>> getColumnAliases()
+    {
+        return columnAliases;
+    }
+
+    public Optional<String> getComment()
+    {
+        return comment;
     }
 
     @Override
@@ -87,16 +99,16 @@ public class CreateTableAsSelect
     @Override
     public List<Node> getChildren()
     {
-        ImmutableList.Builder<Node> nodes = ImmutableList.builder();
-        nodes.add(query);
-        nodes.addAll(properties.values());
-        return nodes.build();
+        return ImmutableList.<Node>builder()
+                .add(query)
+                .addAll(properties)
+                .build();
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(name, query, properties, withData);
+        return Objects.hash(name, query, properties, withData, columnAliases, comment);
     }
 
     @Override
@@ -113,7 +125,9 @@ public class CreateTableAsSelect
                 && Objects.equals(query, o.query)
                 && Objects.equals(notExists, o.notExists)
                 && Objects.equals(properties, o.properties)
-                && Objects.equals(withData, o.withData);
+                && Objects.equals(withData, o.withData)
+                && Objects.equals(columnAliases, o.columnAliases)
+                && Objects.equals(comment, o.comment);
     }
 
     @Override
@@ -125,6 +139,8 @@ public class CreateTableAsSelect
                 .add("notExists", notExists)
                 .add("properties", properties)
                 .add("withData", withData)
+                .add("columnAliases", columnAliases)
+                .add("comment", comment)
                 .toString();
     }
 }

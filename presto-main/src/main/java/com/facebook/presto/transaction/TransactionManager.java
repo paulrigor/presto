@@ -53,16 +53,15 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import static com.facebook.presto.spi.StandardErrorCode.AUTOCOMMIT_WRITE_CONFLICT;
-import static com.facebook.presto.spi.StandardErrorCode.INVALID_CONCURRENT_QUERY;
 import static com.facebook.presto.spi.StandardErrorCode.MULTI_CATALOG_WRITE_CONFLICT;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_FOUND;
 import static com.facebook.presto.spi.StandardErrorCode.READ_ONLY_VIOLATION;
 import static com.facebook.presto.spi.StandardErrorCode.TRANSACTION_ALREADY_ABORTED;
 import static com.facebook.presto.spi.StandardErrorCode.UNKNOWN_TRANSACTION;
-import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.nonCancellationPropagating;
@@ -145,6 +144,11 @@ public class TransactionManager
                 entry.getValue().asyncAbort();
             }
         }
+    }
+
+    public boolean transactionExists(TransactionId transactionId)
+    {
+        return tryGetTransactionMetadata(transactionId).isPresent();
     }
 
     public TransactionInfo getTransactionInfo(TransactionId transactionId)
@@ -321,12 +325,7 @@ public class TransactionManager
 
         public void setActive()
         {
-            idleStartTime.getAndUpdate(value -> {
-                if (value == null) {
-                    throw new PrestoException(INVALID_CONCURRENT_QUERY, "Concurrent queries within a single transaction are not allowed");
-                }
-                return null;
-            });
+            idleStartTime.set(null);
         }
 
         public void setInActive()
@@ -405,8 +404,7 @@ public class TransactionManager
                 catalogMetadata = new CatalogMetadata(
                         metadata.getConnectorId(), metadata.getConnectorMetadata(), metadata.getTransactionHandle(),
                         informationSchema.getConnectorId(), informationSchema.getConnectorMetadata(), informationSchema.getTransactionHandle(),
-                        systemTables.getConnectorId(), systemTables.getConnectorMetadata(), systemTables.getTransactionHandle()
-                );
+                        systemTables.getConnectorId(), systemTables.getConnectorMetadata(), systemTables.getTransactionHandle());
 
                 this.catalogMetadata.put(catalog.getConnectorId(), catalogMetadata);
                 this.catalogMetadata.put(catalog.getInformationSchemaId(), catalogMetadata);
@@ -465,7 +463,7 @@ public class TransactionManager
                 ListenableFuture<?> future = Futures.allAsList(connectorIdToMetadata.values().stream()
                         .map(transactionMetadata -> finishingExecutor.submit(transactionMetadata::commit))
                         .collect(toList()));
-                addExceptionCallback(future, throwable ->  {
+                addExceptionCallback(future, throwable -> {
                     abortInternal();
                     log.error(throwable, "Read-only connector should not throw exception on commit");
                 });

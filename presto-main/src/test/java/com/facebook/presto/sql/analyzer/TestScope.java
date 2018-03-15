@@ -30,15 +30,15 @@ public class TestScope
     @Test
     public void test()
     {
-        Scope root = Scope.builder().build();
+        Scope root = Scope.create();
 
         Field outerColumn1 = Field.newQualified(QualifiedName.of("outer", "column1"), Optional.of("c1"), BIGINT, false, Optional.empty(), false);
         Field outerColumn2 = Field.newQualified(QualifiedName.of("outer", "column2"), Optional.of("c2"), BIGINT, false, Optional.empty(), false);
-        Scope outer = Scope.builder().withParent(root).withRelationType(new RelationType(outerColumn1, outerColumn2)).build();
+        Scope outer = Scope.builder().withParent(root).withRelationType(RelationId.anonymous(), new RelationType(outerColumn1, outerColumn2)).build();
 
         Field innerColumn2 = Field.newQualified(QualifiedName.of("inner", "column2"), Optional.of("c2"), BIGINT, false, Optional.empty(), false);
         Field innerColumn3 = Field.newQualified(QualifiedName.of("inner", "column3"), Optional.of("c3"), BIGINT, false, Optional.empty(), false);
-        Scope inner = Scope.builder().withParent(outer).withRelationType(new RelationType(innerColumn2, innerColumn3)).build();
+        Scope inner = Scope.builder().withOuterQueryParent(outer).withRelationType(RelationId.anonymous(), new RelationType(innerColumn2, innerColumn3)).build();
 
         Expression c1 = name("c1");
         Expression c2 = name("c2");
@@ -50,22 +50,30 @@ public class TestScope
         assertTrue(outer.tryResolveField(c1).isPresent());
         assertEquals(outer.tryResolveField(c1).get().getField(), outerColumn1);
         assertEquals(outer.tryResolveField(c1).get().isLocal(), true);
+        assertEquals(outer.tryResolveField(c1).get().getHierarchyFieldIndex(), 0);
         assertTrue(outer.tryResolveField(c2).isPresent());
         assertEquals(outer.tryResolveField(c2).get().getField(), outerColumn2);
         assertEquals(outer.tryResolveField(c2).get().isLocal(), true);
+        assertEquals(outer.tryResolveField(c2).get().getHierarchyFieldIndex(), 1);
         assertFalse(outer.tryResolveField(c3).isPresent());
         assertFalse(outer.tryResolveField(c4).isPresent());
 
         assertTrue(inner.tryResolveField(c1).isPresent());
         assertEquals(inner.tryResolveField(c1).get().getField(), outerColumn1);
         assertEquals(inner.tryResolveField(c1).get().isLocal(), false);
+        assertEquals(inner.tryResolveField(c1).get().getHierarchyFieldIndex(), 2);
+        assertEquals(inner.tryResolveField(c1).get().getRelationFieldIndex(), 0);
         assertTrue(inner.tryResolveField(c2).isPresent());
         assertEquals(inner.tryResolveField(c2).get().getField(), innerColumn2);
         assertEquals(inner.tryResolveField(c2).get().isLocal(), true);
+        assertEquals(inner.tryResolveField(c2).get().getHierarchyFieldIndex(), 0);
         assertTrue(inner.tryResolveField(c2).isPresent());
         assertEquals(inner.tryResolveField(c3).get().getField(), innerColumn3);
         assertEquals(inner.tryResolveField(c3).get().isLocal(), true);
+        assertEquals(inner.tryResolveField(c3).get().getHierarchyFieldIndex(), 1);
         assertFalse(inner.tryResolveField(c4).isPresent());
+
+        assertEquals(inner.getOuterQueryParent(), Optional.of(outer));
     }
 
     private static Expression name(String first, String... parts)

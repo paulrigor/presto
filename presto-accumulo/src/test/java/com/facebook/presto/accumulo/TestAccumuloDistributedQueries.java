@@ -38,7 +38,6 @@ public class TestAccumuloDistributedQueries
         extends AbstractTestDistributedQueries
 {
     public TestAccumuloDistributedQueries()
-            throws Exception
     {
         super(() -> createAccumuloQueryRunner(ImmutableMap.of()));
     }
@@ -47,6 +46,12 @@ public class TestAccumuloDistributedQueries
     public void testAddColumn()
     {
         // Adding columns via SQL are not supported until adding columns with comments are supported
+    }
+
+    @Override
+    public void testDropColumn()
+    {
+        // Dropping columns are not supported by the connector
     }
 
     @Override
@@ -172,14 +177,6 @@ public class TestAccumuloDistributedQueries
                 + "extendedprice, discount, tax, returnflag, linestatus, "
                 + "shipdate, commitdate, receiptdate, shipinstruct, shipmode, a.comment "
                 + "FROM (SELECT * FROM lineitem WHERE orderkey % 2 = 0) a LEFT JOIN orders ON a.orderkey = orders.orderkey");
-    }
-
-    @Override
-    @Test
-    public void testJoinWithDuplicateRelations()
-    {
-        // Override because of extra UUID column in lineitem table, cannot SELECT *
-        // Cannot munge test to pass due to aliased data sets 'x' containing duplicate orderkey and comment columns
     }
 
     @Override
@@ -343,6 +340,22 @@ public class TestAccumuloDistributedQueries
         }
         finally {
             assertUpdate("DROP TABLE test_select_null_value");
+        }
+    }
+
+    @Test
+    public void testCreateTableEmptyColumns()
+    {
+        try {
+            assertUpdate("CREATE TABLE test_create_table_empty_columns WITH (column_mapping = 'a:a:a,b::b,c:c:,d::', index_columns='a,b,c,d') AS SELECT 1 id, 2 a, 3 b, 4 c, 5 d", 1);
+            assertQuery("SELECT * FROM test_create_table_empty_columns", "SELECT 1, 2, 3, 4, 5");
+            assertQuery("SELECT * FROM test_create_table_empty_columns WHERE a = 2", "SELECT 1, 2, 3, 4, 5");
+            assertQuery("SELECT * FROM test_create_table_empty_columns WHERE b = 3", "SELECT 1, 2, 3, 4, 5");
+            assertQuery("SELECT * FROM test_create_table_empty_columns WHERE c = 4", "SELECT 1, 2, 3, 4, 5");
+            assertQuery("SELECT * FROM test_create_table_empty_columns WHERE d = 5", "SELECT 1, 2, 3, 4, 5");
+        }
+        finally {
+            assertUpdate("DROP TABLE test_create_table_empty_columns");
         }
     }
 

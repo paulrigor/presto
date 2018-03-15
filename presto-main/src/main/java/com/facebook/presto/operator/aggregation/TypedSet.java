@@ -13,52 +13,61 @@
  */
 package com.facebook.presto.operator.aggregation;
 
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
-import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.Type;
+import com.google.common.annotations.VisibleForTesting;
 import io.airlift.units.DataSize;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.openjdk.jol.info.ClassLayout;
 
-import static com.facebook.presto.ExceededMemoryLimitException.exceededLocalLimit;
+import static com.facebook.presto.spi.StandardErrorCode.EXCEEDED_FUNCTION_MEMORY_LIMIT;
+import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INSUFFICIENT_RESOURCES;
 import static com.facebook.presto.type.TypeUtils.hashPosition;
 import static com.facebook.presto.type.TypeUtils.positionEqualsPosition;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static it.unimi.dsi.fastutil.HashCommon.arraySize;
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public class TypedSet
 {
+    @VisibleForTesting
+    public static final DataSize MAX_FUNCTION_MEMORY = new DataSize(4, MEGABYTE);
+
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(TypedSet.class).instanceSize();
     private static final int INT_ARRAY_LIST_INSTANCE_SIZE = ClassLayout.parseClass(IntArrayList.class).instanceSize();
     private static final float FILL_RATIO = 0.75f;
-    private static final long FOUR_MEGABYTES = new DataSize(4, MEGABYTE).toBytes();
+    static final long FOUR_MEGABYTES = MAX_FUNCTION_MEMORY.toBytes();
 
     private final Type elementType;
     private final IntArrayList blockPositionByHash;
     private final BlockBuilder elementBlock;
+    private final String functionName;
 
+    private int hashCapacity;
     private int maxFill;
     private int hashMask;
     private static final int EMPTY_SLOT = -1;
 
     private boolean containsNullElement;
 
-    public TypedSet(Type elementType, int expectedSize)
+    public TypedSet(Type elementType, int expectedSize, String functionName)
     {
         checkArgument(expectedSize >= 0, "expectedSize must not be negative");
         this.elementType = requireNonNull(elementType, "elementType must not be null");
-        this.elementBlock = elementType.createBlockBuilder(new BlockBuilderStatus(), expectedSize);
+        this.elementBlock = elementType.createBlockBuilder(null, expectedSize);
+        this.functionName = functionName;
 
-        int hashSize = arraySize(expectedSize, FILL_RATIO);
-        this.maxFill = calculateMaxFill(hashSize);
-        this.hashMask = hashSize - 1;
+        hashCapacity = arraySize(expectedSize, FILL_RATIO);
+        this.maxFill = calculateMaxFill(hashCapacity);
+        this.hashMask = hashCapacity - 1;
 
-        blockPositionByHash = new IntArrayList(hashSize);
-        blockPositionByHash.size(hashSize);
-        for (int i = 0; i < hashSize; i++) {
+        blockPositionByHash = new IntArrayList(hashCapacity);
+        blockPositionByHash.size(hashCapacity);
+        for (int i = 0; i < hashCapacity; i++) {
             blockPositionByHash.set(i, EMPTY_SLOT);
         }
 
@@ -134,23 +143,33 @@ public class TypedSet
     {
         elementType.appendTo(block, position, elementBlock);
         if (elementBlock.getSizeInBytes() > FOUR_MEGABYTES) {
-            throw exceededLocalLimit(new DataSize(4, MEGABYTE));
+            throw new PrestoException(
+                    EXCEEDED_FUNCTION_MEMORY_LIMIT,
+                    format("The input to %s is too large. More than %s of memory is needed to hold the intermediate hash set.\n",
+                            functionName,
+                            MAX_FUNCTION_MEMORY));
         }
         blockPositionByHash.set(hashPosition, elementBlock.getPositionCount() - 1);
 
         // increase capacity, if necessary
         if (elementBlock.getPositionCount() >= maxFill) {
-            rehash(maxFill * 2);
+            rehash();
         }
     }
 
-    private void rehash(int size)
+    private void rehash()
     {
-        int newHashSize = arraySize(size + 1, FILL_RATIO);
-        hashMask = newHashSize - 1;
-        maxFill = calculateMaxFill(newHashSize);
-        blockPositionByHash.size(newHashSize);
-        for (int i = 0; i < newHashSize; i++) {
+        long newCapacityLong = hashCapacity * 2L;
+        if (newCapacityLong > Integer.MAX_VALUE) {
+            throw new PrestoException(GENERIC_INSUFFICIENT_RESOURCES, "Size of hash table cannot exceed 1 billion entries");
+        }
+        int newCapacity = (int) newCapacityLong;
+
+        hashCapacity = newCapacity;
+        hashMask = newCapacity - 1;
+        maxFill = calculateMaxFill(newCapacity);
+        blockPositionByHash.size(newCapacity);
+        for (int i = 0; i < newCapacity; i++) {
             blockPositionByHash.set(i, EMPTY_SLOT);
         }
 
@@ -166,10 +185,12 @@ public class TypedSet
 
     private static int calculateMaxFill(int hashSize)
     {
+        checkArgument(hashSize > 0, "hashSize must be greater than 0");
         int maxFill = (int) Math.ceil(hashSize * FILL_RATIO);
         if (maxFill == hashSize) {
             maxFill--;
         }
+        checkArgument(hashSize > maxFill, "hashSize must be larger than maxFill");
         return maxFill;
     }
 

@@ -13,25 +13,25 @@
  */
 package com.facebook.presto.sql.planner.iterative.rule;
 
-import com.facebook.presto.sql.planner.iterative.rule.test.RuleTester;
+import com.facebook.presto.sql.planner.iterative.rule.test.BaseRuleTest;
 import com.google.common.collect.ImmutableMap;
 import org.testng.annotations.Test;
 
-import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.filter;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.values;
 import static com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder.expression;
 
 public class TestMergeFilters
+        extends BaseRuleTest
 {
     @Test
     public void test()
     {
-        new RuleTester().assertThat(new MergeFilters())
+        tester().assertThat(new MergeFilters())
                 .on(p ->
                         p.filter(expression("b > 44"),
                                 p.filter(expression("a < 42"),
-                                        p.values(p.symbol("a", BIGINT), p.symbol("b", BIGINT)))))
+                                        p.values(p.symbol("a"), p.symbol("b")))))
                 .matches(filter("(a < 42) AND (b > 44)", values(ImmutableMap.of("a", 0, "b", 1))));
     }
 }

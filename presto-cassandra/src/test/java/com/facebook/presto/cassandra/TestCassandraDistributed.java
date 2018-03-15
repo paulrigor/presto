@@ -19,7 +19,7 @@ import org.testng.annotations.Test;
 
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.testing.MaterializedResult.resultBuilder;
-import static org.testng.Assert.assertEquals;
+import static com.facebook.presto.testing.assertions.Assert.assertEquals;
 
 //Integrations tests fail when parallel, due to a bug or configuration error in the embedded
 //cassandra instance. This problem results in either a hang in Thrift calls or broken sockets.
@@ -28,7 +28,6 @@ public class TestCassandraDistributed
         extends AbstractTestDistributedQueries
 {
     public TestCassandraDistributed()
-            throws Exception
     {
         super(CassandraQueryRunner::createCassandraQueryRunner);
     }
@@ -40,13 +39,7 @@ public class TestCassandraDistributed
     }
 
     @Override
-    public void testGroupingSetMixedExpressionAndColumn()
-    {
-        // Cassandra does not support DATE
-    }
-
-    @Override
-    public void testGroupingSetMixedExpressionAndOrdinal()
+    public void testJoinWithLessThanOnDatesInJoinClause()
     {
         // Cassandra does not support DATE
     }
@@ -67,6 +60,12 @@ public class TestCassandraDistributed
     public void testRenameColumn()
     {
         // Cassandra does not support renaming columns
+    }
+
+    @Override
+    public void testDropColumn()
+    {
+        // Cassandra does not support dropping columns
     }
 
     @Override
@@ -123,5 +122,11 @@ public class TestCassandraDistributed
     public void testDescribeOutputNamedAndUnnamed()
     {
         // this connector uses a non-canonical type for varchar columns in tpch
+    }
+
+    @Override
+    public void testWrittenStats()
+    {
+        // Cassandra connector currently does not support create table nor insert
     }
 }

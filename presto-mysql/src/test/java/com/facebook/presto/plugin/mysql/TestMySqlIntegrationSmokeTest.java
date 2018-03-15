@@ -29,9 +29,9 @@ import java.sql.Statement;
 import static com.facebook.presto.plugin.mysql.MySqlQueryRunner.createMySqlQueryRunner;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
+import static com.facebook.presto.testing.assertions.Assert.assertEquals;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.airlift.tpch.TpchTable.ORDERS;
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -48,7 +48,6 @@ public class TestMySqlIntegrationSmokeTest
     }
 
     public TestMySqlIntegrationSmokeTest(TestingMySqlServer mysqlServer)
-            throws Exception
     {
         super(() -> createMySqlQueryRunner(mysqlServer, ORDERS));
         this.mysqlServer = mysqlServer;
@@ -62,10 +61,9 @@ public class TestMySqlIntegrationSmokeTest
 
     @Override
     public void testDescribeTable()
-            throws Exception
     {
         // we need specific implementation of this tests due to specific Presto<->Mysql varchar length mapping.
-        MaterializedResult actualColumns = computeActual("DESC ORDERS").toJdbcTypes();
+        MaterializedResult actualColumns = computeActual("DESC ORDERS").toTestTypes();
 
         // some connectors don't support dates, and some do not support parametrized varchars, so we check multiple options
         MaterializedResult expectedColumns = MaterializedResult.resultBuilder(getQueryRunner().getDefaultSession(), VARCHAR, VARCHAR, VARCHAR, VARCHAR)
@@ -83,6 +81,25 @@ public class TestMySqlIntegrationSmokeTest
     }
 
     @Test
+    public void testDropTable()
+    {
+        assertUpdate("CREATE TABLE test_drop AS SELECT 123 x", 1);
+        assertTrue(getQueryRunner().tableExists(getSession(), "test_drop"));
+
+        assertUpdate("DROP TABLE test_drop");
+        assertFalse(getQueryRunner().tableExists(getSession(), "test_drop"));
+    }
+
+    @Test
+    public void testViews()
+            throws SQLException
+    {
+        execute("CREATE OR REPLACE VIEW tpch.test_view AS SELECT * FROM tpch.orders");
+        assertQuery("SELECT orderkey FROM test_view", "SELECT orderkey FROM orders");
+        execute("DROP VIEW IF EXISTS tpch.test_view");
+    }
+
+    @Test
     public void testInsert()
             throws Exception
     {
@@ -94,7 +111,6 @@ public class TestMySqlIntegrationSmokeTest
 
     @Test
     public void testNameEscaping()
-            throws Exception
     {
         Session session = testSessionBuilder()
                 .setCatalog("mysql")

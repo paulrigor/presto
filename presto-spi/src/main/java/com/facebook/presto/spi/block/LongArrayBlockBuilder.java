@@ -15,36 +15,40 @@ package com.facebook.presto.spi.block;
 
 import org.openjdk.jol.info.ClassLayout;
 
+import javax.annotation.Nullable;
+
 import java.util.Arrays;
-import java.util.List;
+import java.util.function.BiConsumer;
 
 import static com.facebook.presto.spi.block.BlockUtil.calculateBlockResetSize;
+import static com.facebook.presto.spi.block.BlockUtil.checkArrayRange;
 import static com.facebook.presto.spi.block.BlockUtil.checkValidRegion;
-import static com.facebook.presto.spi.block.BlockUtil.intSaturatedCast;
 import static io.airlift.slice.SizeOf.sizeOf;
+import static java.lang.Math.max;
 import static java.lang.Math.toIntExact;
-import static java.util.Objects.requireNonNull;
 
 public class LongArrayBlockBuilder
         implements BlockBuilder
 {
-    private static final int INSTANCE_SIZE = ClassLayout.parseClass(LongArrayBlockBuilder.class).instanceSize() + BlockBuilderStatus.INSTANCE_SIZE;
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(LongArrayBlockBuilder.class).instanceSize();
 
+    @Nullable
     private BlockBuilderStatus blockBuilderStatus;
+    private boolean initialized;
+    private int initialEntryCount;
 
     private int positionCount;
 
     // it is assumed that these arrays are the same length
-    private boolean[] valueIsNull;
-    private long[] values;
+    private boolean[] valueIsNull = new boolean[0];
+    private long[] values = new long[0];
 
-    private int retainedSizeInBytes;
+    private long retainedSizeInBytes;
 
-    public LongArrayBlockBuilder(BlockBuilderStatus blockBuilderStatus, int expectedEntries)
+    public LongArrayBlockBuilder(@Nullable BlockBuilderStatus blockBuilderStatus, int expectedEntries)
     {
-        this.blockBuilderStatus = requireNonNull(blockBuilderStatus, "blockBuilderStatus is null");
-        this.values = new long[expectedEntries];
-        this.valueIsNull = new boolean[expectedEntries];
+        this.blockBuilderStatus = blockBuilderStatus;
+        this.initialEntryCount = max(expectedEntries, 1);
 
         updateDataSize();
     }
@@ -59,7 +63,9 @@ public class LongArrayBlockBuilder
         values[positionCount] = value;
 
         positionCount++;
-        blockBuilderStatus.addBytes(Byte.BYTES + Long.BYTES);
+        if (blockBuilderStatus != null) {
+            blockBuilderStatus.addBytes(Byte.BYTES + Long.BYTES);
+        }
         return this;
     }
 
@@ -79,7 +85,9 @@ public class LongArrayBlockBuilder
         valueIsNull[positionCount] = true;
 
         positionCount++;
-        blockBuilderStatus.addBytes(Byte.BYTES + Long.BYTES);
+        if (blockBuilderStatus != null) {
+            blockBuilderStatus.addBytes(Byte.BYTES + Long.BYTES);
+        }
         return this;
     }
 
@@ -90,22 +98,22 @@ public class LongArrayBlockBuilder
     }
 
     @Override
-    public void reset(BlockBuilderStatus blockBuilderStatus)
+    public BlockBuilder newBlockBuilderLike(BlockBuilderStatus blockBuilderStatus)
     {
-        this.blockBuilderStatus = requireNonNull(blockBuilderStatus, "blockBuilderStatus is null");
-
-        int newSize = calculateBlockResetSize(positionCount);
-        valueIsNull = new boolean[newSize];
-        values = new long[newSize];
-
-        positionCount = 0;
-
-        updateDataSize();
+        return new LongArrayBlockBuilder(blockBuilderStatus, calculateBlockResetSize(positionCount));
     }
 
     private void growCapacity()
     {
-        int newSize = BlockUtil.calculateNewArraySize(values.length);
+        int newSize;
+        if (initialized) {
+            newSize = BlockUtil.calculateNewArraySize(values.length);
+        }
+        else {
+            newSize = initialEntryCount;
+            initialized = true;
+        }
+
         valueIsNull = Arrays.copyOf(valueIsNull, newSize);
         values = Arrays.copyOf(values, newSize);
         updateDataSize();
@@ -113,26 +121,36 @@ public class LongArrayBlockBuilder
 
     private void updateDataSize()
     {
-        retainedSizeInBytes = intSaturatedCast(INSTANCE_SIZE + sizeOf(valueIsNull) + sizeOf(values));
+        retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + sizeOf(values);
+        if (blockBuilderStatus != null) {
+            retainedSizeInBytes += BlockBuilderStatus.INSTANCE_SIZE;
+        }
     }
 
-    // Copied from LongArrayBlock
     @Override
-    public int getSizeInBytes()
+    public long getSizeInBytes()
     {
-        return intSaturatedCast((Long.BYTES + Byte.BYTES) * (long) positionCount);
+        return (Long.BYTES + Byte.BYTES) * (long) positionCount;
     }
 
     @Override
-    public int getRegionSizeInBytes(int position, int length)
+    public long getRegionSizeInBytes(int position, int length)
     {
-        return intSaturatedCast((Long.BYTES + Byte.BYTES) * (long) length);
+        return (Long.BYTES + Byte.BYTES) * (long) length;
     }
 
     @Override
-    public int getRetainedSizeInBytes()
+    public long getRetainedSizeInBytes()
     {
         return retainedSizeInBytes;
+    }
+
+    @Override
+    public void retainedBytesForEachPart(BiConsumer<Object, Long> consumer)
+    {
+        consumer.accept(values, sizeOf(values));
+        consumer.accept(valueIsNull, sizeOf(valueIsNull));
+        consumer.accept(this, (long) INSTANCE_SIZE);
     }
 
     @Override
@@ -222,17 +240,19 @@ public class LongArrayBlockBuilder
     }
 
     @Override
-    public Block copyPositions(List<Integer> positions)
+    public Block copyPositions(int[] positions, int offset, int length)
     {
-        boolean[] newValueIsNull = new boolean[positions.size()];
-        long[] newValues = new long[positions.size()];
-        for (int i = 0; i < positions.size(); i++) {
-            int position = positions.get(i);
+        checkArrayRange(positions, offset, length);
+
+        boolean[] newValueIsNull = new boolean[length];
+        long[] newValues = new long[length];
+        for (int i = 0; i < length; i++) {
+            int position = positions[offset + i];
             checkReadablePosition(position);
             newValueIsNull[i] = valueIsNull[position];
             newValues[i] = values[position];
         }
-        return new LongArrayBlock(positions.size(), newValueIsNull, newValues);
+        return new LongArrayBlock(length, newValueIsNull, newValues);
     }
 
     @Override

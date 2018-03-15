@@ -76,6 +76,15 @@ public interface BlockBuilder
     }
 
     /**
+     * Create a new block from the current materialized block by keeping the same elements
+     * only with respect to {@code visiblePositions}.
+     */
+    default Block getPositions(int[] visiblePositions, int offset, int length)
+    {
+        return build().getPositions(visiblePositions, offset, length);
+    }
+
+    /**
      * Write a byte to the current entry;
      */
     BlockBuilder closeEntry();
@@ -91,7 +100,7 @@ public interface BlockBuilder
     Block build();
 
     /**
-     * Resets the block builder, clearing all of the data.
+     * Creates a new block builder of the same type based on the current usage statistics of this block builder.
      */
-    void reset(BlockBuilderStatus blockBuilderStatus);
+    BlockBuilder newBlockBuilderLike(BlockBuilderStatus blockBuilderStatus);
 }

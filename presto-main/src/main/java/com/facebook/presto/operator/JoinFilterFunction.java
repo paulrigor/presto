@@ -15,6 +15,9 @@ package com.facebook.presto.operator;
 
 import com.facebook.presto.spi.Page;
 
+import javax.annotation.concurrent.NotThreadSafe;
+
+@NotThreadSafe
 public interface JoinFilterFunction
 {
     boolean filter(int leftAddress, int rightPosition, Page rightPage);

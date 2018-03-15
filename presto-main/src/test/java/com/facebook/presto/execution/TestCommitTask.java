@@ -54,14 +54,12 @@ public class TestCommitTask
 
     @AfterClass(alwaysRun = true)
     public void tearDown()
-            throws Exception
     {
         executor.shutdownNow();
     }
 
     @Test
     public void testCommit()
-            throws Exception
     {
         TransactionManager transactionManager = createTestTransactionManager();
         AccessControl accessControl = new AccessControlManager(transactionManager);
@@ -69,10 +67,6 @@ public class TestCommitTask
         Session session = sessionBuilder()
                 .setTransactionId(transactionManager.beginTransaction(false))
                 .build();
-
-        // Simulate the START TRANSACTION statement and set the transaction as inactive
-        transactionManager.trySetInactive(session.getRequiredTransactionId());
-
         QueryStateMachine stateMachine = QueryStateMachine.begin(new QueryId("query"), "COMMIT", session, URI.create("fake://uri"), true, transactionManager, accessControl, executor, metadata);
         assertTrue(stateMachine.getSession().getTransactionId().isPresent());
         assertEquals(transactionManager.getAllTransactionInfos().size(), 1);
@@ -86,7 +80,6 @@ public class TestCommitTask
 
     @Test
     public void testNoTransactionCommit()
-            throws Exception
     {
         TransactionManager transactionManager = createTestTransactionManager();
         AccessControl accessControl = new AccessControlManager(transactionManager);
@@ -115,7 +108,6 @@ public class TestCommitTask
 
     @Test
     public void testUnknownTransactionCommit()
-            throws Exception
     {
         TransactionManager transactionManager = createTestTransactionManager();
         AccessControl accessControl = new AccessControlManager(transactionManager);

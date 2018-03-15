@@ -38,8 +38,8 @@ import java.util.UUID;
 import static com.facebook.presto.redis.util.RedisTestUtils.createEmptyTableDescription;
 import static com.facebook.presto.redis.util.RedisTestUtils.installRedisPlugin;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
+import static com.facebook.presto.testing.assertions.Assert.assertEquals;
 import static com.facebook.presto.transaction.TransactionBuilder.transaction;
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 @Test(singleThreaded = true)
@@ -62,9 +62,8 @@ public class TestMinimalFunctionality
         embeddedRedis.start();
     }
 
-    @AfterClass
+    @AfterClass(alwaysRun = true)
     public void stopRedis()
-            throws Exception
     {
         embeddedRedis.close();
     }
@@ -85,7 +84,6 @@ public class TestMinimalFunctionality
 
     @AfterMethod
     public void tearDown()
-            throws Exception
     {
         queryRunner.close();
     }
@@ -110,7 +108,6 @@ public class TestMinimalFunctionality
 
     @Test
     public void testTableExists()
-            throws Exception
     {
         QualifiedObjectName name = new QualifiedObjectName("redis", "default", tableName);
         transaction(queryRunner.getTransactionManager(), new AllowAllAccessControl())
@@ -123,7 +120,6 @@ public class TestMinimalFunctionality
 
     @Test
     public void testTableHasData()
-            throws Exception
     {
         MaterializedResult result = queryRunner.execute("SELECT count(1) from " + tableName);
 

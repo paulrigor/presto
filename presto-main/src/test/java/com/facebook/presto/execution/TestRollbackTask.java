@@ -53,14 +53,12 @@ public class TestRollbackTask
 
     @AfterClass(alwaysRun = true)
     public void tearDown()
-            throws Exception
     {
         executor.shutdownNow();
     }
 
     @Test
     public void testRollback()
-            throws Exception
     {
         TransactionManager transactionManager = createTestTransactionManager();
         AccessControl accessControl = new AccessControlManager(transactionManager);
@@ -68,10 +66,6 @@ public class TestRollbackTask
         Session session = sessionBuilder()
                 .setTransactionId(transactionManager.beginTransaction(false))
                 .build();
-
-        // simulate the START TRANSACTION task and set the transaction as inactive
-        transactionManager.trySetInactive(session.getRequiredTransactionId());
-
         QueryStateMachine stateMachine = QueryStateMachine.begin(new QueryId("query"), "ROLLBACK", session, URI.create("fake://uri"), true, transactionManager, accessControl, executor, metadata);
         assertTrue(stateMachine.getSession().getTransactionId().isPresent());
         assertEquals(transactionManager.getAllTransactionInfos().size(), 1);
@@ -85,7 +79,6 @@ public class TestRollbackTask
 
     @Test
     public void testNoTransactionRollback()
-            throws Exception
     {
         TransactionManager transactionManager = createTestTransactionManager();
         AccessControl accessControl = new AccessControlManager(transactionManager);
@@ -114,7 +107,6 @@ public class TestRollbackTask
 
     @Test
     public void testUnknownTransactionRollback()
-            throws Exception
     {
         TransactionManager transactionManager = createTestTransactionManager();
         AccessControl accessControl = new AccessControlManager(transactionManager);

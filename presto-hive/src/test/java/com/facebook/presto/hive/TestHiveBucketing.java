@@ -19,7 +19,6 @@ import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -49,7 +48,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.facebook.presto.hive.HiveBucketing.HiveBucket;
-import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
+import static com.facebook.presto.hive.HiveTestUtils.TYPE_MANAGER;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Maps.immutableEntry;
 import static io.airlift.slice.Slices.utf8Slice;
 import static java.lang.Float.floatToRawIntBits;
@@ -64,11 +64,8 @@ import static org.testng.Assert.assertTrue;
 
 public class TestHiveBucketing
 {
-    private static final TypeRegistry typeRegistry = new TypeRegistry();
-
     @Test
     public void testHashingBooleanLong()
-            throws Exception
     {
         List<Entry<ObjectInspector, Object>> bindings = ImmutableList.<Entry<ObjectInspector, Object>>builder()
                 .add(entry(javaBooleanObjectInspector, true))
@@ -83,7 +80,6 @@ public class TestHiveBucketing
 
     @Test
     public void testHashingString()
-            throws Exception
     {
         List<Entry<ObjectInspector, Object>> bindings = ImmutableList.<Entry<ObjectInspector, Object>>builder()
                 .add(entry(javaStringObjectInspector, utf8Slice("sequencefile test")))
@@ -167,12 +163,10 @@ public class TestHiveBucketing
         // multiple bucketing columns
         assertBucketEquals(
                 ImmutableList.of("float", "array<smallint>", "map<string,bigint>"),
-                ImmutableList.of(12.34F, ImmutableList.of((short) 5, (short) 8, (short) 13), ImmutableMap.of("key", 123L))
-        );
+                ImmutableList.of(12.34F, ImmutableList.of((short) 5, (short) 8, (short) 13), ImmutableMap.of("key", 123L)));
         assertBucketEquals(
                 ImmutableList.of("double", "array<smallint>", "boolean", "map<string,bigint>", "tinyint"),
-                asList(null, ImmutableList.of((short) 5, (short) 8, (short) 13), null, ImmutableMap.of("key", 123L), null)
-        );
+                asList(null, ImmutableList.of((short) 5, (short) 8, (short) 13), null, ImmutableMap.of("key", 123L), null));
     }
 
     private static void assertBucketEquals(String hiveTypeStrings, Object javaValues)
@@ -218,7 +212,7 @@ public class TestHiveBucketing
         ImmutableList.Builder<Block> blockListBuilder = ImmutableList.builder();
         for (int i = 0; i < hiveTypeStrings.size(); i++) {
             Object javaValue = javaValues.get(i);
-            Type type = hiveTypes.get(i).getType(typeRegistry);
+            Type type = hiveTypes.get(i).getType(TYPE_MANAGER);
 
             BlockBuilder blockBuilder = type.createBlockBuilder(new BlockBuilderStatus(), 3);
             // prepend 2 nulls to make sure position is respected when HiveBucketing function

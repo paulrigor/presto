@@ -64,7 +64,7 @@ public interface PagesHashStrategy
      * values are compared positionally, so {@code rightPage} must have the same number of entries as
      * the hashed columns and each entry is expected to be the same type.
      * {@code rightPage} is used if join uses filter function and must contain all columns from probe side of join.
-     *
+     * <p>
      * This method does not perform any null checks.
      */
     boolean positionEqualsRowIgnoreNulls(int leftBlockIndex, int leftPosition, int rightPosition, Page rightPage);
@@ -83,7 +83,7 @@ public interface PagesHashStrategy
 
     /**
      * Compares the hashed columns in this PagesHashStrategy at the specified positions.
-     *
+     * <p>
      * This method does not perform any null checks.
      */
     boolean positionEqualsPositionIgnoreNulls(int leftBlockIndex, int leftPosition, int rightBlockIndex, int rightPosition);
@@ -92,4 +92,14 @@ public interface PagesHashStrategy
      * Checks if any of the hashed columns is null
      */
     boolean isPositionNull(int blockIndex, int blockPosition);
+
+    /**
+     * Compares sort channel (if applicable) values at the specified positions.
+     */
+    int compareSortChannelPositions(int leftBlockIndex, int leftBlockPosition, int rightBlockIndex, int rightBlockPosition);
+
+    /**
+     * Checks if sort channel is null at the specified position
+     */
+    boolean isSortChannelPositionNull(int blockIndex, int blockPosition);
 }

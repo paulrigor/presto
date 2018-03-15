@@ -15,7 +15,6 @@ package com.facebook.presto.operator;
 
 import com.facebook.presto.operator.PartitionedOutputOperator.PartitionedOutputInfo;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
-import com.google.common.collect.ImmutableList;
 import io.airlift.json.JsonCodec;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
@@ -29,7 +28,7 @@ import static org.testng.Assert.assertEquals;
 
 public class TestOperatorStats
 {
-    private static final ExchangeClientStatus NON_MERGEABLE_INFO = new ExchangeClientStatus(0, 1, 2, false, ImmutableList.of());
+    private static final SplitOperatorInfo NON_MERGEABLE_INFO = new SplitOperatorInfo("some_info");
     private static final PartitionedOutputInfo MERGEABLE_INFO = new PartitionedOutputInfo(1, 2);
 
     public static final OperatorStats EXPECTED = new OperatorStats(
@@ -55,6 +54,8 @@ public class TestOperatorStats
             new DataSize(13, BYTE),
             14,
 
+            new DataSize(23, BYTE),
+
             new Duration(15, NANOSECONDS),
 
             16,
@@ -64,6 +65,7 @@ public class TestOperatorStats
 
             new DataSize(20, BYTE),
             new DataSize(21, BYTE),
+            new DataSize(22, BYTE),
             Optional.empty(),
             NON_MERGEABLE_INFO);
 
@@ -90,6 +92,8 @@ public class TestOperatorStats
             new DataSize(13, BYTE),
             14,
 
+            new DataSize(23, BYTE),
+
             new Duration(15, NANOSECONDS),
 
             16,
@@ -99,6 +103,7 @@ public class TestOperatorStats
 
             new DataSize(20, BYTE),
             new DataSize(21, BYTE),
+            new DataSize(22, BYTE),
             Optional.empty(),
             MERGEABLE_INFO);
 
@@ -134,6 +139,8 @@ public class TestOperatorStats
         assertEquals(actual.getOutputDataSize(), new DataSize(13, BYTE));
         assertEquals(actual.getOutputPositions(), 14);
 
+        assertEquals(actual.getPhysicalWrittenDataSize(), new DataSize(23, BYTE));
+
         assertEquals(actual.getBlockedWall(), new Duration(15, NANOSECONDS));
 
         assertEquals(actual.getFinishCalls(), 16);
@@ -141,10 +148,11 @@ public class TestOperatorStats
         assertEquals(actual.getFinishCpu(), new Duration(18, NANOSECONDS));
         assertEquals(actual.getFinishUser(), new Duration(19, NANOSECONDS));
 
-        assertEquals(actual.getMemoryReservation(), new DataSize(20, BYTE));
-        assertEquals(actual.getSystemMemoryReservation(), new DataSize(21, BYTE));
-        assertEquals(actual.getInfo().getClass(), ExchangeClientStatus.class);
-        assertEquals(((ExchangeClientStatus) actual.getInfo()).getAverageBytesPerRequest(), NON_MERGEABLE_INFO.getAverageBytesPerRequest());
+        assertEquals(actual.getUserMemoryReservation(), new DataSize(20, BYTE));
+        assertEquals(actual.getRevocableMemoryReservation(), new DataSize(21, BYTE));
+        assertEquals(actual.getSystemMemoryReservation(), new DataSize(22, BYTE));
+        assertEquals(actual.getInfo().getClass(), SplitOperatorInfo.class);
+        assertEquals(((SplitOperatorInfo) actual.getInfo()).getSplitInfo(), NON_MERGEABLE_INFO.getSplitInfo());
     }
 
     @Test
@@ -171,14 +179,17 @@ public class TestOperatorStats
         assertEquals(actual.getOutputDataSize(), new DataSize(3 * 13, BYTE));
         assertEquals(actual.getOutputPositions(), 3 * 14);
 
+        assertEquals(actual.getPhysicalWrittenDataSize(), new DataSize(3 * 23, BYTE));
+
         assertEquals(actual.getBlockedWall(), new Duration(3 * 15, NANOSECONDS));
 
         assertEquals(actual.getFinishCalls(), 3 * 16);
         assertEquals(actual.getFinishWall(), new Duration(3 * 17, NANOSECONDS));
         assertEquals(actual.getFinishCpu(), new Duration(3 * 18, NANOSECONDS));
         assertEquals(actual.getFinishUser(), new Duration(3 * 19, NANOSECONDS));
-        assertEquals(actual.getMemoryReservation(), new DataSize(3 * 20, BYTE));
-        assertEquals(actual.getSystemMemoryReservation(), new DataSize(3 * 21, BYTE));
+        assertEquals(actual.getUserMemoryReservation(), new DataSize(3 * 20, BYTE));
+        assertEquals(actual.getRevocableMemoryReservation(), new DataSize(3 * 21, BYTE));
+        assertEquals(actual.getSystemMemoryReservation(), new DataSize(3 * 22, BYTE));
         assertEquals(actual.getInfo(), null);
     }
 
@@ -206,14 +217,17 @@ public class TestOperatorStats
         assertEquals(actual.getOutputDataSize(), new DataSize(3 * 13, BYTE));
         assertEquals(actual.getOutputPositions(), 3 * 14);
 
+        assertEquals(actual.getPhysicalWrittenDataSize(), new DataSize(3 * 23, BYTE));
+
         assertEquals(actual.getBlockedWall(), new Duration(3 * 15, NANOSECONDS));
 
         assertEquals(actual.getFinishCalls(), 3 * 16);
         assertEquals(actual.getFinishWall(), new Duration(3 * 17, NANOSECONDS));
         assertEquals(actual.getFinishCpu(), new Duration(3 * 18, NANOSECONDS));
         assertEquals(actual.getFinishUser(), new Duration(3 * 19, NANOSECONDS));
-        assertEquals(actual.getMemoryReservation(), new DataSize(3 * 20, BYTE));
-        assertEquals(actual.getSystemMemoryReservation(), new DataSize(3 * 21, BYTE));
+        assertEquals(actual.getUserMemoryReservation(), new DataSize(3 * 20, BYTE));
+        assertEquals(actual.getRevocableMemoryReservation(), new DataSize(3 * 21, BYTE));
+        assertEquals(actual.getSystemMemoryReservation(), new DataSize(3 * 22, BYTE));
         assertEquals(actual.getInfo().getClass(), PartitionedOutputInfo.class);
         assertEquals(((PartitionedOutputInfo) actual.getInfo()).getPagesAdded(), 3 * MERGEABLE_INFO.getPagesAdded());
     }

@@ -18,6 +18,7 @@ import com.facebook.presto.connector.ConnectorId;
 import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
+import com.facebook.presto.spi.security.GrantInfo;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
@@ -30,8 +31,8 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
 
-import static com.facebook.presto.util.ImmutableCollectors.toImmutableMap;
-import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 public final class MetadataListing
 {
@@ -71,6 +72,20 @@ public final class MetadataListing
                 .map(QualifiedObjectName::asSchemaTableName)
                 .collect(toImmutableSet());
         return accessControl.filterTables(session.getRequiredTransactionId(), session.getIdentity(), prefix.getCatalogName(), tableNames);
+    }
+
+    public static Set<GrantInfo> listTablePrivileges(Session session, Metadata metadata, AccessControl accessControl, QualifiedTablePrefix prefix)
+    {
+        List<GrantInfo> grants = metadata.listTablePrivileges(session, prefix);
+        Set<SchemaTableName> allowedTables = accessControl.filterTables(
+                session.getRequiredTransactionId(),
+                session.getIdentity(),
+                prefix.getCatalogName(),
+                grants.stream().map(grantInfo -> grantInfo.getSchemaTableName()).collect(toImmutableSet()));
+
+        return grants.stream()
+                .filter(grantInfo -> allowedTables.contains(grantInfo.getSchemaTableName()))
+                .collect(toImmutableSet());
     }
 
     public static Map<SchemaTableName, List<ColumnMetadata>> listTableColumns(Session session, Metadata metadata, AccessControl accessControl, QualifiedTablePrefix prefix)

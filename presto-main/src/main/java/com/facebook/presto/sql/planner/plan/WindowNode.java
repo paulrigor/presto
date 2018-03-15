@@ -14,12 +14,11 @@
 package com.facebook.presto.sql.planner.plan;
 
 import com.facebook.presto.metadata.Signature;
-import com.facebook.presto.spi.block.SortOrder;
+import com.facebook.presto.sql.planner.OrderingScheme;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.tree.FrameBound;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.WindowFrame;
-import com.facebook.presto.util.ImmutableCollectors;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
@@ -36,6 +35,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.concat;
 import static java.util.Objects.requireNonNull;
 
@@ -67,7 +67,8 @@ public class WindowNode
         requireNonNull(windowFunctions, "windowFunctions is null");
         requireNonNull(hashSymbol, "hashSymbol is null");
         checkArgument(specification.getPartitionBy().containsAll(prePartitionedInputs), "prePartitionedInputs must be contained in partitionBy");
-        checkArgument(preSortedOrderPrefix <= specification.getOrderBy().size(), "Cannot have sorted more symbols than those requested");
+        Optional<OrderingScheme> orderingScheme = specification.getOrderingScheme();
+        checkArgument(preSortedOrderPrefix == 0 || (orderingScheme.isPresent() && preSortedOrderPrefix <= orderingScheme.get().getOrderBy().size()), "Cannot have sorted more symbols than those requested");
         checkArgument(preSortedOrderPrefix == 0 || ImmutableSet.copyOf(prePartitionedInputs).equals(ImmutableSet.copyOf(specification.getPartitionBy())), "preSortedOrderPrefix can only be greater than zero if all partition symbols are pre-partitioned");
 
         this.source = source;
@@ -112,14 +113,9 @@ public class WindowNode
         return specification.getPartitionBy();
     }
 
-    public List<Symbol> getOrderBy()
+    public Optional<OrderingScheme> getOrderingScheme()
     {
-        return specification.getOrderBy();
-    }
-
-    public Map<Symbol, SortOrder> getOrderings()
-    {
-        return specification.getOrderings();
+        return specification.orderingScheme;
     }
 
     @JsonProperty
@@ -132,7 +128,7 @@ public class WindowNode
     {
         return windowFunctions.values().stream()
                 .map(WindowNode.Function::getFrame)
-                .collect(ImmutableCollectors.toImmutableList());
+                .collect(toImmutableList());
     }
 
     @JsonProperty
@@ -154,7 +150,7 @@ public class WindowNode
     }
 
     @Override
-    public <C, R> R accept(PlanVisitor<C, R> visitor, C context)
+    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
     {
         return visitor.visitWindow(this, context);
     }
@@ -169,23 +165,18 @@ public class WindowNode
     public static class Specification
     {
         private final List<Symbol> partitionBy;
-        private final List<Symbol> orderBy;
-        private final Map<Symbol, SortOrder> orderings;
+        private final Optional<OrderingScheme> orderingScheme;
 
         @JsonCreator
         public Specification(
                 @JsonProperty("partitionBy") List<Symbol> partitionBy,
-                @JsonProperty("orderBy") List<Symbol> orderBy,
-                @JsonProperty("orderings") Map<Symbol, SortOrder> orderings)
+                @JsonProperty("orderingScheme") Optional<OrderingScheme> orderingScheme)
         {
             requireNonNull(partitionBy, "partitionBy is null");
-            requireNonNull(orderBy, "orderBy is null");
-            checkArgument(orderings.size() == orderBy.size(), "orderBy and orderings sizes don't match");
-            checkArgument(orderings.keySet().containsAll(orderBy), "Every orderBy symbol must have an ordering direction");
+            requireNonNull(orderingScheme, "orderingScheme is null");
 
             this.partitionBy = ImmutableList.copyOf(partitionBy);
-            this.orderBy = ImmutableList.copyOf(orderBy);
-            this.orderings = ImmutableMap.copyOf(orderings);
+            this.orderingScheme = requireNonNull(orderingScheme, "orderingScheme is null");
         }
 
         @JsonProperty
@@ -195,21 +186,15 @@ public class WindowNode
         }
 
         @JsonProperty
-        public List<Symbol> getOrderBy()
+        public Optional<OrderingScheme> getOrderingScheme()
         {
-            return orderBy;
-        }
-
-        @JsonProperty
-        public Map<Symbol, SortOrder> getOrderings()
-        {
-            return orderings;
+            return orderingScheme;
         }
 
         @Override
         public int hashCode()
         {
-            return Objects.hash(partitionBy, orderBy, orderings);
+            return Objects.hash(partitionBy, orderingScheme);
         }
 
         @Override
@@ -226,8 +211,7 @@ public class WindowNode
             Specification other = (Specification) obj;
 
             return Objects.equals(this.partitionBy, other.partitionBy) &&
-                    Objects.equals(this.orderBy, other.orderBy) &&
-                    Objects.equals(this.orderings, other.orderings);
+                    Objects.equals(this.orderingScheme, other.orderingScheme);
         }
     }
 

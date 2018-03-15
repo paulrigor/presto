@@ -64,6 +64,11 @@ public class AllowAllSystemAccessControl
     }
 
     @Override
+    public void checkCanAccessCatalog(Identity identity, String catalogName)
+    {
+    }
+
+    @Override
     public Set<String> filterCatalogs(Identity identity, Set<String> catalogs)
     {
         return catalogs;
@@ -111,7 +116,7 @@ public class AllowAllSystemAccessControl
     }
 
     @Override
-    public void checkCanShowTables(Identity identity, CatalogSchemaName schema)
+    public void checkCanShowTablesMetadata(Identity identity, CatalogSchemaName schema)
     {
     }
 
@@ -123,6 +128,11 @@ public class AllowAllSystemAccessControl
 
     @Override
     public void checkCanAddColumn(Identity identity, CatalogSchemaTableName table)
+    {
+    }
+
+    @Override
+    public void checkCanDropColumn(Identity identity, CatalogSchemaTableName table)
     {
     }
 
@@ -177,12 +187,12 @@ public class AllowAllSystemAccessControl
     }
 
     @Override
-    public void checkCanGrantTablePrivilege(Identity identity, Privilege privilege, CatalogSchemaTableName table)
+    public void checkCanGrantTablePrivilege(Identity identity, Privilege privilege, CatalogSchemaTableName table, String grantee, boolean withGrantOption)
     {
     }
 
     @Override
-    public void checkCanRevokeTablePrivilege(Identity identity, Privilege privilege, CatalogSchemaTableName table)
+    public void checkCanRevokeTablePrivilege(Identity identity, Privilege privilege, CatalogSchemaTableName table, String revokee, boolean grantOptionFor)
     {
     }
 }

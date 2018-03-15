@@ -63,6 +63,11 @@ public class ReadOnlySystemAccessControl
     }
 
     @Override
+    public void checkCanAccessCatalog(Identity identity, String catalogName)
+    {
+    }
+
+    @Override
     public void checkCanSelectFromTable(Identity identity, CatalogSchemaTableName table)
     {
     }
@@ -111,7 +116,7 @@ public class ReadOnlySystemAccessControl
     }
 
     @Override
-    public void checkCanShowTables(Identity identity, CatalogSchemaName schema)
+    public void checkCanShowTablesMetadata(Identity identity, CatalogSchemaName schema)
     {
     }
 }

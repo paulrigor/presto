@@ -33,7 +33,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 
 import static com.facebook.presto.jdbc.TestPrestoDriver.closeQuietly;
-import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.airlift.testing.Assertions.assertContains;
 import static java.lang.String.format;
@@ -57,6 +57,7 @@ public class TestPrestoDatabaseMetaData
 
     @AfterClass(alwaysRun = true)
     public void tearDownServer()
+            throws Exception
     {
         server.close();
     }
@@ -71,7 +72,6 @@ public class TestPrestoDatabaseMetaData
 
     @AfterMethod(alwaysRun = true)
     public void tearDown()
-            throws SQLException
     {
         closeQuietly(connection);
     }

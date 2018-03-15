@@ -16,6 +16,7 @@ package com.facebook.presto.hive;
 import com.facebook.presto.hive.authentication.HiveAuthenticationModule;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.facebook.presto.hive.metastore.HiveMetastoreModule;
+import com.facebook.presto.hive.s3.HiveS3Module;
 import com.facebook.presto.hive.security.HiveSecurityModule;
 import com.facebook.presto.spi.ConnectorHandleResolver;
 import com.facebook.presto.spi.classloader.ThreadContextClassLoader;
@@ -36,6 +37,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.Injector;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.bootstrap.LifeCycleManager;
+import io.airlift.event.client.EventModule;
 import io.airlift.json.JsonModule;
 import org.weakref.jmx.guice.MBeanModule;
 
@@ -83,6 +85,7 @@ public class HiveConnectorFactory
 
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             Bootstrap app = new Bootstrap(
+                    new EventModule(),
                     new MBeanModule(),
                     new JsonModule(),
                     new HiveClientModule(
@@ -90,6 +93,7 @@ public class HiveConnectorFactory
                             context.getTypeManager(),
                             context.getPageIndexerFactory(),
                             context.getNodeManager()),
+                    new HiveS3Module(connectorId),
                     new HiveMetastoreModule(connectorId, Optional.ofNullable(metastore)),
                     new HiveSecurityModule(),
                     new HiveAuthenticationModule(),
@@ -97,8 +101,7 @@ public class HiveConnectorFactory
                         MBeanServer platformMBeanServer = ManagementFactory.getPlatformMBeanServer();
                         binder.bind(MBeanServer.class).toInstance(new RebindSafeMBeanServer(platformMBeanServer));
                         binder.bind(NodeVersion.class).toInstance(new NodeVersion(context.getNodeManager().getCurrentNode().getVersion()));
-                    }
-            );
+                    });
 
             Injector injector = app
                     .strictConfig()

@@ -24,7 +24,7 @@ import static com.facebook.presto.connector.informationSchema.InformationSchemaM
 import static com.facebook.presto.connector.jmx.JmxMetadata.HISTORY_SCHEMA_NAME;
 import static com.facebook.presto.connector.jmx.JmxMetadata.JMX_SCHEMA_NAME;
 import static com.facebook.presto.tests.QueryAssertions.assertEqualsIgnoreOrder;
-import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.lang.String.format;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -42,14 +42,12 @@ public class TestJmxQueries
             .build();
 
     public TestJmxQueries()
-            throws Exception
     {
         super(JmxQueryRunner::createJmxQueryRunner);
     }
 
     @Test
     public void testShowSchemas()
-            throws Exception
     {
         MaterializedResult result = computeActual("SHOW SCHEMAS");
         assertEquals(result.getOnlyColumnAsSet(), ImmutableSet.of(INFORMATION_SCHEMA, JMX_SCHEMA_NAME, HISTORY_SCHEMA_NAME));
@@ -57,7 +55,6 @@ public class TestJmxQueries
 
     @Test
     public void testShowTables()
-            throws Exception
     {
         Set<String> standardNamesLower = STANDARD_NAMES.stream()
                 .map(String::toLowerCase)
@@ -68,7 +65,6 @@ public class TestJmxQueries
 
     @Test
     public void testQuery()
-            throws Exception
     {
         for (String name : STANDARD_NAMES) {
             computeActual(format("SELECT * FROM \"%s\"", name));

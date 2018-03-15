@@ -16,26 +16,26 @@ package com.facebook.presto.server;
 import com.facebook.presto.execution.QueryInfo;
 import com.facebook.presto.execution.QueryManager;
 import com.facebook.presto.execution.resourceGroups.ResourceGroupManager;
-import com.facebook.presto.spi.resourceGroups.ResourceGroupId;
-import com.facebook.presto.spi.resourceGroups.ResourceGroupInfo;
-import com.google.common.collect.ImmutableList;
+import com.facebook.presto.spi.QueryId;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.NoSuchElementException;
 import java.util.regex.Pattern;
 
 import static com.facebook.presto.server.QueryStateInfo.createQueryStateInfo;
-import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
-import static com.facebook.presto.util.ImmutableCollectors.toImmutableMap;
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
-import static java.util.function.Function.identity;
+import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
 @Path("/v1/queryState")
 public class QueryStateInfoResource
@@ -53,29 +53,35 @@ public class QueryStateInfoResource
     }
 
     @GET
-    public List<QueryStateInfo> getQueryDiagnosticsByUser(@QueryParam("user") String user)
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<QueryStateInfo> getQueryStateInfos(@QueryParam("user") String user)
     {
-        if (isNullOrEmpty(user)) {
-            return ImmutableList.of();
+        List<QueryInfo> queryInfos = queryManager.getAllQueryInfo();
+
+        if (!isNullOrEmpty(user)) {
+            queryInfos = queryInfos.stream()
+                    .filter(queryInfo -> Pattern.matches(user, queryInfo.getSession().getUser()))
+                    .collect(toImmutableList());
         }
-        List<QueryInfo> userQueries = queryManager.getAllQueryInfo().stream()
-                .filter(queryInfo -> Pattern.matches(user, queryInfo.getSession().getUser()))
+
+        return queryInfos.stream()
                 .filter(queryInfo -> !queryInfo.getState().isDone())
+                .map(queryInfo -> createQueryStateInfo(queryInfo, queryManager.getQueryResourceGroup(queryInfo.getQueryId()).map(resourceGroupManager::getResourceGroupInfo)))
                 .collect(toImmutableList());
+    }
 
-        Map<ResourceGroupId, ResourceGroupInfo> rootResourceGroupInfos = userQueries.stream()
-                .map(queryInfo -> queryManager.getQueryResourceGroup(queryInfo.getQueryId()))
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .map(ResourceGroupId::getRoot)
-                .distinct()
-                .collect(toImmutableMap(identity(), resourceGroupManager::getResourceGroupInfo));
-
-        return userQueries.stream()
-                .map(queryInfo -> createQueryStateInfo(
-                        queryInfo,
-                        queryManager.getQueryResourceGroup(queryInfo.getQueryId()),
-                        queryManager.getQueryResourceGroup(queryInfo.getQueryId()).map(ResourceGroupId::getRoot).map(rootResourceGroupInfos::get)))
-                .collect(toImmutableList());
+    @GET
+    @Path("{queryId}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public QueryStateInfo getQueryStateInfo(@PathParam("queryId") String queryId)
+            throws WebApplicationException
+    {
+        try {
+            QueryInfo queryInfo = queryManager.getQueryInfo(new QueryId(queryId));
+            return createQueryStateInfo(queryInfo, queryManager.getQueryResourceGroup(queryInfo.getQueryId()).map(resourceGroupManager::getResourceGroupInfo));
+        }
+        catch (NoSuchElementException e) {
+            throw new WebApplicationException(NOT_FOUND);
+        }
     }
 }
